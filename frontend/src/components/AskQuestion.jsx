@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 function percentage(value) {
   return value == null ? 'Not reported' : `${(value * 100).toFixed(1)}%`
@@ -21,7 +21,7 @@ export default function AskQuestion({ threshold, setThreshold }) {
     setError(null)
     setResult(null)
     try {
-      const response = await axios.post('/api/ask', { question: question.trim(), threshold })
+      const response = await api.post('/ask', { question: question.trim(), threshold })
       setResult(response.data)
     } catch (requestError) {
       setError(requestError.response?.data?.detail || 'The API could not process this question.')

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import axios from 'axios'
+import api from '../api'
 
 function percent(value) {
   return value == null ? '—' : `${(value * 100).toFixed(1)}%`
@@ -26,7 +26,7 @@ export default function BatchAsk({ threshold }) {
     setError(null)
     setResults([])
     try {
-      const response = await axios.post('/api/ask/batch', { questions, threshold })
+      const response = await api.post('/ask/batch', { questions, threshold })
       setResults(response.data.results)
     } catch (requestError) {
       setError(requestError.response?.data?.detail || 'Batch request failed. Check the API and provider configuration.')

@@ -1,5 +1,6 @@
+
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import axios from 'axios'
+import api from './api'
 import Navbar from './components/Navbar.jsx'
 
 const Overview = lazy(() => import('./components/Overview.jsx'))
@@ -32,44 +33,77 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const health = await axios.get('/api/health')
+      const health = await api.get('/health')
+
       setBackendStatus(health.data.status === 'ok')
       setProviders(health.data.providers || [])
       setBackendError(null)
       setEvaluationError(health.data.evaluation_error)
+
       try {
-        const result = await axios.get('/api/metrics')
+        const result = await api.get('/metrics')
         setMetrics(result.data)
-        if (!thresholdInitialized && result.data.evaluation?.threshold != null) {
+
+        if (
+          !thresholdInitialized &&
+          result.data.evaluation?.threshold != null
+        ) {
           setThreshold(result.data.evaluation.threshold)
           setThresholdInitialized(true)
         }
+
         setEvaluationError(null)
       } catch (error) {
         setMetrics(null)
-        setEvaluationError(error.response?.data?.detail || 'Saved evaluation metrics are unavailable.')
+        setEvaluationError(
+          error.response?.data?.detail ||
+          'Saved evaluation metrics are unavailable.'
+        )
       }
     } catch (error) {
       setBackendStatus(false)
       setProviders([])
       setMetrics(null)
-      setBackendError(error.response?.data?.detail || 'Cannot reach the API. Start the backend and configure providers.')
+      setBackendError(
+        error.response?.data?.detail ||
+        'Cannot reach the API. Start the backend and configure providers.'
+      )
     }
   }, [thresholdInitialized])
 
   useEffect(() => {
     refresh()
+
     const timer = window.setInterval(refresh, 30000)
+
     return () => window.clearInterval(timer)
   }, [refresh])
 
   const Page = PAGES[activeTab] || Overview
+
   return (
     <div className="app-layout">
-      <Navbar activeTab={activeTab} onTabChange={setActiveTab} backendStatus={backendStatus} />
+      <Navbar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        backendStatus={backendStatus}
+      />
+
       <main className="main-content">
-        {backendError && <div className="alert alert-warning" role="status">{backendError}</div>}
-        <Suspense fallback={<div className="loading-container"><span className="loading-spinner" />Loading view…</div>}>
+        {backendError && (
+          <div className="alert alert-warning" role="status">
+            {backendError}
+          </div>
+        )}
+
+        <Suspense
+          fallback={
+            <div className="loading-container">
+              <span className="loading-spinner" />
+              Loading view…
+            </div>
+          }
+        >
           <Page
             metrics={metrics}
             threshold={threshold}
@@ -80,8 +114,10 @@ export default function App() {
           />
         </Suspense>
       </main>
+
       <footer className="app-footer">
-        TrustMeter — When Should an AI Admit It Is Unsure? · Live verdicts estimate correctness; they are not proof.
+        TrustMeter — When Should an AI Admit It Is Unsure? · Live verdicts
+        estimate correctness; they are not proof.
       </footer>
     </div>
   )
