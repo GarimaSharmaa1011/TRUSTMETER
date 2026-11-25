@@ -1,3 +1,4 @@
+
 """TrustMeter multi-model question-checking API."""
 
 import asyncio
@@ -69,30 +70,45 @@ def load_saved_evaluation() -> None:
     model_path = BACKEND_DIR / "models" / "trust_estimator.joblib"
     metadata_path = BACKEND_DIR / "models" / "training_metadata.json"
     metrics_path = BACKEND_DIR / "models" / "metrics.json"
+
     try:
         if model_path.exists() and metadata_path.exists() and metrics_path.exists():
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+
             if (
                 metadata.get("model_ids") != MODEL_IDS
                 or metadata.get("feature_names") != trust_feature_names(MODEL_IDS)
             ):
                 state["trust_estimator"] = None
                 state["metrics"] = None
-                state["error"] = "Configured models differ from the saved evaluation. Rerun ARC evaluation."
+                state["error"] = (
+                    "Configured models differ from the saved evaluation. "
+                    "Rerun ARC evaluation."
+                )
                 return
+
             state["trust_estimator"] = joblib.load(model_path)
             state["historical_accuracy"] = metadata["historical_accuracy"]
-            state["metrics"] = json.loads(metrics_path.read_text(encoding="utf-8"))
+            state["metrics"] = json.loads(
+                metrics_path.read_text(encoding="utf-8")
+            )
             state["error"] = None
+
         else:
             state["trust_estimator"] = None
             state["metrics"] = None
-            state["error"] = "ARC evaluation has not been completed. Run python -m train.evaluate."
+            state["error"] = (
+                "ARC evaluation has not been completed. "
+                "Run python -m train.evaluate."
+            )
+
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
         logger.exception("Could not load saved ARC evaluation.")
         state["trust_estimator"] = None
         state["metrics"] = None
-        state["error"] = f"Saved evaluation could not be loaded ({type(exc).__name__})."
+        state["error"] = (
+            f"Saved evaluation could not be loaded ({type(exc).__name__})."
+        )
 
 
 @asynccontextmanager
@@ -103,10 +119,16 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="TrustMeter — When Should an AI Admit It Is Unsure?",
-    description="Multi-model answer comparison with a calibrated trust estimate. A verdict is not proof of correctness.",
+    description=(
+        "Multi-model answer comparison with a calibrated trust estimate. "
+        "A verdict is not proof of correctness."
+    ),
     version="2.0.0",
     lifespan=lifespan,
 )
+
+
+# CORS: allow local development and the deployed Vercel frontend.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -114,6 +136,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:4173",
         "http://127.0.0.1:4173",
+        "https://trustmeter-ochre.vercel.app",
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
@@ -124,10 +147,16 @@ app.add_middleware(
 @app.exception_handler(RequestValidationError)
 async def validation_error_response(request: Request, exc: RequestValidationError):
     del request
+
     errors = [
-        {"loc": list(error["loc"]), "msg": error["msg"], "type": error["type"]}
+        {
+            "loc": list(error["loc"]),
+            "msg": error["msg"],
+            "type": error["type"],
+        }
         for error in exc.errors()
     ]
+
     return JSONResponse(status_code=422, content={"detail": errors})
 
 
@@ -140,12 +169,14 @@ async def _provider_status(model: ModelConfig) -> dict[str, Any]:
             "reachable": False,
             "error": f"API key is not configured ({model.api_key_env}).",
         }
+
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             response = await client.get(
                 model.base_url.rstrip("/") + "/models",
                 headers={"Authorization": f"Bearer {model.api_key}"},
             )
+
         return {
             "id": model.id,
             "display_name": model.display_name,
@@ -154,9 +185,11 @@ async def _provider_status(model: ModelConfig) -> dict[str, Any]:
             "status_code": response.status_code,
             "error": (
                 f"Provider returned HTTP {response.status_code}."
-                if response.status_code >= 400 else None
+                if response.status_code >= 400
+                else None
             ),
         }
+
     except httpx.TimeoutException:
         return {
             "id": model.id,
@@ -165,6 +198,7 @@ async def _provider_status(model: ModelConfig) -> dict[str, Any]:
             "reachable": False,
             "error": "Provider health check timed out.",
         }
+
     except httpx.HTTPError as exc:
         return {
             "id": model.id,
@@ -178,42 +212,70 @@ async def _provider_status(model: ModelConfig) -> dict[str, Any]:
 async def _answer(question: str, threshold: float) -> dict[str, Any]:
     responses = await ask_models(MODELS, question)
     grouping = group_answers(responses, MODEL_IDS)
-    answered_model_count = sum(bool(item.get("answer")) for item in responses)
+
+    answered_model_count = sum(
+        bool(item.get("answer")) for item in responses
+    )
+
     trust_score: float | None = None
+
     if state["trust_estimator"] is not None and grouping["consensus_answer"]:
         features = calculate_trust_features(
-            responses, MODEL_IDS, state["historical_accuracy"]
+            responses,
+            MODEL_IDS,
+            state["historical_accuracy"],
         )
+
         probabilities = state["trust_estimator"].predict_proba(
             np.asarray([features], dtype=float)
         )[0]
+
         classes = list(state["trust_estimator"].classes_)
+
         if 1 in classes:
             trust_score = float(probabilities[classes.index(1)])
 
-    provider_errors = [item for item in responses if item.get("error")]
+    provider_errors = [
+        item for item in responses if item.get("error")
+    ]
+
     if state["trust_estimator"] is None:
         status = "trust_estimator_not_trained"
         verdict = None
         message = (
-            "Trust estimator not trained; raw model answers are shown without a trust verdict."
+            "Trust estimator not trained; raw model answers "
+            "are shown without a trust verdict."
         )
+
     elif not grouping["consensus_answer"] or trust_score is None:
         status = "ok" if answered_model_count else "no_usable_answers"
         verdict = "ABSTAIN"
         message = "No model has a trustworthy answer."
-    elif grouping["tie"] or grouping["dissenting_model_ids"] or provider_errors:
+
+    elif (
+        grouping["tie"]
+        or grouping["dissenting_model_ids"]
+        or provider_errors
+    ):
         status = "ok"
         verdict = "DISPUTED"
-        message = "Models disagree or some providers failed; treat the consensus as disputed."
+        message = (
+            "Models disagree or some providers failed; "
+            "treat the consensus as disputed."
+        )
+
     elif trust_score < threshold:
         status = "ok"
         verdict = "ABSTAIN"
         message = "No model has a trustworthy answer."
+
     else:
         status = "ok"
         verdict = "TRUSTED"
-        message = "Models agree and the calibrated trust estimate meets the threshold."
+        message = (
+            "Models agree and the calibrated trust estimate "
+            "meets the threshold."
+        )
 
     return {
         "question": question,
@@ -256,23 +318,28 @@ async def _answer(question: str, threshold: float) -> dict[str, Any]:
 
 @app.get("/health")
 async def health():
-    if os.getenv("TRUSTMETER_DISABLE_PROVIDER_HEALTH_CHECKS", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-    }:
+    if os.getenv(
+        "TRUSTMETER_DISABLE_PROVIDER_HEALTH_CHECKS", ""
+    ).strip().lower() in {"1", "true", "yes"}:
+
         providers = [
             {
                 "id": model.id,
                 "display_name": model.display_name,
                 "configured": bool(model.api_key),
                 "reachable": None,
-                "error": "Provider reachability was not checked (offline mode).",
+                "error": (
+                    "Provider reachability was not checked (offline mode)."
+                ),
             }
             for model in MODELS
         ]
+
     else:
-        providers = await asyncio.gather(*(_provider_status(model) for model in MODELS))
+        providers = await asyncio.gather(
+            *(_provider_status(model) for model in MODELS)
+        )
+
     return {
         "status": "ok",
         "trust_estimator_loaded": state["trust_estimator"] is not None,
@@ -286,6 +353,7 @@ async def health():
 def get_metrics():
     if state["metrics"] is None:
         raise HTTPException(status_code=503, detail=state["error"])
+
     return state["metrics"]
 
 
@@ -293,7 +361,9 @@ def get_metrics():
 def get_reliability():
     if state["metrics"] is None:
         raise HTTPException(status_code=503, detail=state["error"])
+
     metrics = state["metrics"]
+
     return {
         "reliability": metrics["reliability"],
         "risk_coverage": metrics["risk_coverage"],
@@ -309,6 +379,13 @@ async def ask(request: AskRequest):
 @app.post("/ask/batch")
 async def ask_batch(request: BatchAskRequest):
     results = []
+
     for question in request.questions:
-        results.append(await _answer(question, request.threshold))
-    return {"results": results, "count": len(results)}
+        results.append(
+            await _answer(question, request.threshold)
+        )
+
+    return {
+        "results": results,
+        "count": len(results),
+    }
