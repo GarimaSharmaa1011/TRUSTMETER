@@ -1,0 +1,20 @@
+models:
+  - id: groq-gpt-oss-20b
+    display_name: GPT OSS 20B (Groq)
+    base_url: https://api.groq.com/openai/v1
+    model: openai/gpt-oss-20b
+    api_key_env: GROQ_API_KEY
+    requests_per_minute: 20
+  - id: groq-gpt-oss-120b
+    display_name: GPT OSS 120B (Groq)
+    base_url: https://api.groq.com/openai/v1
+    model: openai/gpt-oss-120b
+    api_key_env: GROQ_API_KEY
+    requests_per_minute: 20
+  - id: gemini-flash
+    display_name: Gemini Flash
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+    model: gemini-3-flash-preview
+    api_key_env: GEMINI_API_KEY
+    enabled: false
+    requests_per_minute: 5

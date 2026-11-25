@@ -1,0 +1,22 @@
+{
+  "model_ids": [
+    "groq-gpt-oss-20b",
+    "groq-gpt-oss-120b"
+  ],
+  "feature_names": [
+    "agreement_fraction",
+    "mean_agree_confidence",
+    "mean_agree_accuracy",
+    "confidence:groq-gpt-oss-20b",
+    "agrees:groq-gpt-oss-20b",
+    "agree_accuracy:groq-gpt-oss-20b",
+    "confidence:groq-gpt-oss-120b",
+    "agrees:groq-gpt-oss-120b",
+    "agree_accuracy:groq-gpt-oss-120b"
+  ],
+  "historical_accuracy": {
+    "groq-gpt-oss-20b": 0.9594594594594594,
+    "groq-gpt-oss-120b": 0.972972972972973
+  },
+  "best_single_model_id": "groq-gpt-oss-120b"
+}

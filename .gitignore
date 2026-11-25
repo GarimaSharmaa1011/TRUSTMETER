@@ -1,0 +1,11 @@
+.env
+**/.env
+**/__pycache__/
+**/.pytest_cache/
+**/.venv/
+**/venv/
+**/node_modules/
+**/dist/
+backend/data/responses_cache.json
+backend/data/responses_cache.json.tmp
+backend/models/*.tmp
